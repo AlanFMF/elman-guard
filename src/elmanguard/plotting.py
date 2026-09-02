@@ -93,17 +93,21 @@ def timeline_figure(
     return fig
 
 
-def comparison_figure(summary: pd.DataFrame, labels: dict[str, str], dark: bool = False):
+def comparison_figure(summary: pd.DataFrame, labels: dict[str, str], dark: bool = False,
+                      lang: str = "en"):
     """PR-AUC per architecture with the spread across seeds as an error bar."""
     import plotly.graph_objects as go
 
+    from .i18n import MODEL_NAMES
+
     c = palette(dark)
+    names = MODEL_NAMES.get(lang, MODEL_NAMES["en"])
     df = summary[summary.index != "prevalence_floor"]
     floor = summary.loc["prevalence_floor", "pr_auc_mean"] if "prevalence_floor" in summary.index else None
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        x=df.index, y=df["pr_auc_mean"],
+        x=[names.get(i, i) for i in df.index], y=df["pr_auc_mean"],
         error_y=dict(type="data", array=df.get("pr_auc_std"), color=c["ink_soft"], width=6),
         marker=dict(color=c["score"], line=dict(width=0)),
         text=[f"{v:.3f}" for v in df["pr_auc_mean"]], textposition="outside",

@@ -33,6 +33,10 @@ TEXT: dict[str, dict[str, str]] = {
         "metric_windows": "Windows",
         "metric_attack": "Attack windows (truth)",
         "metric_flagged": "Flagged by the model",
+        "metric_attack_delta": "{pct} of windows",
+        "p_attack": "P(attack)",
+        "download": "Download CSV",
+        "window_table": "Window table",
         "metric_recall": "Recall at this threshold",
         "results_title": "Measured results",
         "results_intro": (
@@ -54,6 +58,7 @@ TEXT: dict[str, dict[str, str]] = {
         ),
         "how_title": "How it works",
         "no_reports": "Run `python scripts/run_experiment.py` to generate the measured results.",
+        "prevalence_floor_label": "prevalence floor",
         "footer": "ElmanGuard · MIT licence · research use only",
     },
     "pt": {
@@ -84,6 +89,10 @@ TEXT: dict[str, dict[str, str]] = {
         "metric_windows": "Janelas",
         "metric_attack": "Janelas de ataque (real)",
         "metric_flagged": "Sinalizadas pelo modelo",
+        "metric_attack_delta": "{pct} das janelas",
+        "p_attack": "P(ataque)",
+        "download": "Baixar CSV",
+        "window_table": "Tabela de janelas",
         "metric_recall": "Recall neste limiar",
         "results_title": "Resultados medidos",
         "results_intro": (
@@ -106,9 +115,61 @@ TEXT: dict[str, dict[str, str]] = {
         ),
         "how_title": "Como funciona",
         "no_reports": "Rode `python scripts/run_experiment.py` para gerar os resultados medidos.",
+        "prevalence_floor_label": "piso de prevalência",
         "footer": "ElmanGuard · licença MIT · uso em pesquisa apenas",
     },
 }
+
+
+MODEL_NAMES: dict[str, dict[str, str]] = {
+    "en": {
+        "elman": "Elman RNN", "window_mlp": "window MLP",
+        "window_mlp_wide": "window MLP (wide)", "last_flow_mlp": "last-flow MLP",
+        "logistic": "logistic regression", "prevalence_floor": "prevalence floor",
+    },
+    "pt": {
+        "elman": "Rede de Elman", "window_mlp": "MLP da janela",
+        "window_mlp_wide": "MLP da janela (larga)", "last_flow_mlp": "MLP do último fluxo",
+        "logistic": "regressão logística", "prevalence_floor": "piso de prevalência",
+    },
+}
+
+COLUMN_NAMES: dict[str, dict[str, str]] = {
+    "en": {
+        "pr_auc_mean": "PR-AUC", "pr_auc_std": "sd (3 seeds)", "roc_auc_mean": "ROC-AUC",
+        "recall_mean": "recall @ 1% FPR", "precision_mean": "precision", "f1_mean": "F1",
+        "model": "model", "attack type": "attack type", "host": "host",
+        "n_windows": "windows", "positive_rate": "attack rate", "pr_auc": "PR-AUC",
+        "roc_auc": "ROC-AUC", "recall": "recall", "fpr": "FPR",
+        "pr_auc_ordered": "PR-AUC ordered", "pr_auc_shuffled": "PR-AUC shuffled",
+        "pr_auc_drop": "drop", "recall_drop": "recall drop",
+        "pr_auc_ordered_sd": "sd ordered", "pr_auc_shuffled_sd": "sd shuffled",
+    },
+    "pt": {
+        "pr_auc_mean": "PR-AUC", "pr_auc_std": "desvio (3 sementes)", "roc_auc_mean": "ROC-AUC",
+        "recall_mean": "recall a 1% FPR", "precision_mean": "precisão", "f1_mean": "F1",
+        "model": "modelo", "attack type": "tipo de ataque", "host": "host",
+        "n_windows": "janelas", "positive_rate": "taxa de ataque", "pr_auc": "PR-AUC",
+        "roc_auc": "ROC-AUC", "recall": "recall", "fpr": "FPR",
+        "pr_auc_ordered": "PR-AUC ordenado", "pr_auc_shuffled": "PR-AUC embaralhado",
+        "pr_auc_drop": "queda", "recall_drop": "queda no recall",
+        "pr_auc_ordered_sd": "desvio ordenado", "pr_auc_shuffled_sd": "desvio embaralhado",
+    },
+}
+
+
+def pretty(df, lang: str):
+    """Rename a results frame's index and columns for display."""
+    models = MODEL_NAMES.get(lang, MODEL_NAMES["en"])
+    cols = COLUMN_NAMES.get(lang, COLUMN_NAMES["en"])
+    # models appear as the index in some frames and as columns in others
+    out = df.rename(columns={**cols, **models})
+    out = out.rename(index=models)
+    for c in out.columns:
+        if out[c].dtype == object:
+            out[c] = out[c].map(lambda v: models.get(v, v) if isinstance(v, str) else v)
+    out.index.name = cols.get(df.index.name, df.index.name)
+    return out
 
 
 def t(lang: str, key: str, **kwargs) -> str:

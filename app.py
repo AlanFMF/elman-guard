@@ -21,7 +21,7 @@ import streamlit as st  # noqa: E402
 
 from elmanguard.config import DEFAULT  # noqa: E402
 from elmanguard.features import FeaturePipeline  # noqa: E402
-from elmanguard.i18n import LANGUAGES, t  # noqa: E402
+from elmanguard.i18n import LANGUAGES, pretty, t  # noqa: E402
 from elmanguard.plotting import comparison_figure, timeline_figure  # noqa: E402
 
 MODELS = ROOT / "models"
@@ -69,7 +69,7 @@ def load_reports():
     }
 
 
-lang = LANGUAGES[st.sidebar.selectbox("Language / Idioma", list(LANGUAGES), index=0)]
+lang = LANGUAGES[st.sidebar.selectbox("Language / Idioma", list(LANGUAGES), index=1)]
 st.title(t(lang, "title"))
 st.caption(t(lang, "tagline"))
 st.warning(f"**{t(lang, 'disclaimer_title')}** — {t(lang, 'disclaimer')}", icon="🔬")
@@ -105,8 +105,8 @@ else:
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(t(lang, "metric_windows"), f"{mask.sum():,}")
-    c2.metric(t(lang, "metric_attack"), f"{int(y.sum()):,}", f"{y.mean():.0%} of windows",
-              delta_color="off")
+    c2.metric(t(lang, "metric_attack"), f"{int(y.sum()):,}",
+              t(lang, "metric_attack_delta", pct=f"{y.mean():.0%}"), delta_color="off")
     c3.metric(t(lang, "metric_flagged"), f"{flagged:,}")
     c4.metric(t(lang, "metric_recall"), f"{recall:.0%}")
 
@@ -114,11 +114,11 @@ else:
     st.caption(t(lang, "timeline_help"))
     st.plotly_chart(
         timeline_figure(times.to_numpy(), scores, y, threshold,
-                        {"score": "P(attack)",
+                        {"score": t(lang, "p_attack"),
                          "truth": "ground-truth attack" if lang == "en" else "ataque (rótulo real)",
                          "threshold": "alert threshold" if lang == "en" else "limiar de alerta",
                          "x": "window (in time order)" if lang == "en" else "janela (em ordem temporal)",
-                         "y": "P(attack)"}, dark=dark),
+                         "y": t(lang, "p_attack")}, dark=dark),
         width="stretch", config={"displayModeBar": False},
     )
 
@@ -126,10 +126,10 @@ else:
         "time": times, "p_attack": scores, "truth": y,
         "attack_type": demo["attack_type"][mask],
     }).sort_values("time")
-    with st.expander("🔢 " + ("Window table" if lang == "en" else "Tabela de janelas")):
+    with st.expander("🔢 " + t(lang, "window_table")):
         st.dataframe(table, width="stretch", height=300)
     st.download_button(
-        "Download CSV", table.to_csv(index=False).encode(),
+        t(lang, "download"), table.to_csv(index=False).encode(),
         file_name=f"elmanguard_{host}.csv", mime="text/csv",
     )
 
@@ -145,16 +145,17 @@ if reports["pooled"] is None:
 else:
     cols = [c for c in ("pr_auc_mean", "pr_auc_std", "recall_mean", "precision_mean", "f1_mean")
             if c in reports["pooled"].columns]
-    st.dataframe(reports["pooled"][cols], width="stretch")
+    st.dataframe(pretty(reports["pooled"][cols], lang), width="stretch")
     st.plotly_chart(
-        comparison_figure(reports["pooled"], {"floor": "prevalence floor"}, dark=dark),
+        comparison_figure(reports["pooled"],
+                          {"floor": t(lang, "prevalence_floor_label")}, dark=dark, lang=lang),
         width="stretch", config={"displayModeBar": False},
     )
     if reports["per_attack"] is not None:
         st.caption("Recall by attack type — every type below is unseen during training."
                    if lang == "en" else
                    "Recall por tipo de ataque — todos os tipos abaixo são inéditos no treino.")
-        st.dataframe(reports["per_attack"], width="stretch")
+        st.dataframe(pretty(reports["per_attack"], lang), width="stretch")
 
     if reports["random"] is not None:
         delta = (reports["random"]["pr_auc_mean"] - reports["pooled"]["pr_auc_mean"]).dropna()
@@ -172,12 +173,12 @@ else:
 with st.expander("🎯 " + t(lang, "control_title"), expanded=True):
     st.markdown(t(lang, "control_intro"))
     if reports["within_host"] is not None:
-        st.dataframe(reports["within_host"], width="stretch")
+        st.dataframe(pretty(reports["within_host"], lang), width="stretch")
 
 with st.expander("🔀 " + t(lang, "ablation_title"), expanded=True):
     st.markdown(t(lang, "ablation_intro"))
     if reports["ablation"] is not None:
-        st.dataframe(reports["ablation"], width="stretch")
+        st.dataframe(pretty(reports["ablation"], lang), width="stretch")
 
 with st.expander("🧠 " + t(lang, "how_title")):
     doc = ROOT / "docs" / f"how_it_works.{lang}.md"
