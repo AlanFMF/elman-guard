@@ -67,6 +67,69 @@ trechos perto de zero lá dentro. Essa imagem é o controle por host, desenhado.
 | Ataques do teste | PortScan, DDoS, Bot — **nenhum deles visto no treino** |
 | Repetições | todo número abaixo é média ± desvio sobre 3 sementes |
 
+## Arquitetura
+
+O caminho que um fluxo de rede percorre até virar um número deste README:
+
+```mermaid
+flowchart TB
+    CSV["8 CSVs do CICIDS2017<br/>2.827.876 fluxos"] --> Rep["Reparo de 6 defeitos<br/>nomes de coluna, latin-1,<br/>timestamps de 12h sem AM/PM"]
+    Rep --> Feat["78 features numéricas<br/>IPs, portas e Flow ID ficam de fora"]
+    Feat --> Win["Janelas de 16 fluxos consecutivos<br/>por host monitorado, por dia"]
+
+    Win --> Tr["Treino: seg a qua<br/>82.968 janelas"]
+    Win --> Ca["Calibração: quinta<br/>define o limiar de alerta"]
+    Win --> Te["Teste: sexta<br/>ataques nunca vistos no treino"]
+
+    Tr --> Mod
+    Ca --> Mod
+    Te --> Mod
+
+    Mod["Elman · MLP da janela · MLP larga<br/>MLP do último fluxo · logística<br/>orçamento de parâmetros equivalente"] --> Res["Resultado agregado<br/>3 sementes, média e desvio"]
+
+    Res --> C1["Controle 1<br/>métricas dentro de cada host"]
+    Res --> C2["Controle 2<br/>ordem embaralhada na janela"]
+    Res --> C3["Controle 3<br/>aferição do instrumento"]
+```
+
+| Etapa | O que acontece | Por que importa |
+|---|---|---|
+| Reparo | Seis defeitos dos CSVs publicados são corrigidos e testados | Sem isso o arquivo nem carrega direito, e dois deles corrompem o tempo |
+| Features | IPs, portas, `Flow ID` e timestamp saem da matriz | Nesta captura o IP do atacante **é** o rótulo |
+| Sequências | 16 fluxos consecutivos do mesmo host, no mesmo dia | Janela por host evita que a rede aprenda "que horas são"; nunca cruzar o dia evita vazamento no split |
+| Divisão | Cronológica, por dia da semana | Cada dia tem ataques diferentes, então o teste mede generalização para tipos inéditos |
+| Modelos | Cinco, com orçamento de parâmetros equivalente | Isola arquitetura de capacidade |
+| Controles | Três, aplicados sobre o resultado | É o que separa detecção de reconhecimento, e sinal de ruído |
+
+### A rede de Elman
+
+A camada de contexto guarda a ativação da camada oculta do passo anterior e a
+devolve como entrada extra. A rede de Jordan, sua irmã, realimenta a camada de
+saída — a diferença está no ponto de onde parte a seta pontilhada:
+
+```mermaid
+flowchart LR
+    X["x_t<br/>features do fluxo no passo t"] --> H["Camada oculta<br/>h_t = tanh(Wx·x_t + Wh·h_t-1 + b)"]
+    H --> Y["Saída<br/>P(ataque na janela)"]
+    H --> Ctx["Camada de contexto<br/>guarda h_t-1"]
+    Ctx -. "realimenta a entrada oculta" .-> H
+    Y -. "a rede de Jordan realimentaria daqui" .-> Ctx
+```
+
+### O atalho que os controles procuram
+
+Quase todo ataque do CICIDS2017 parte de um único host e atinge um único
+servidor. Isso abre um caminho pelo qual um modelo pontua bem sem detectar nada:
+
+```mermaid
+flowchart TB
+    Q["Uma janela de 16 fluxos<br/>chegando em um servidor"] --> A{"O modelo acertou porque leu o tráfego<br/>ou porque reconheceu o host?"}
+    A -->|"medindo todos os hosts juntos"| P["PR-AUC de 0,31 a 0,55<br/>parece detecção"]
+    A -->|"medindo dentro de cada host"| W["ROC-AUC no acaso<br/>em quase todos os servidores"]
+    P --> D["A distância entre os dois números<br/>é o tamanho do atalho de identidade"]
+    W --> D
+```
+
 ## Resultados
 
 PR-AUC no dia de teste com ataques inéditos. O piso de prevalência — o que um

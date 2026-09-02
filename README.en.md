@@ -66,6 +66,69 @@ near zero inside it. That picture is the within-host control, drawn.
 | Test attacks | PortScan, DDoS, Bot — **none of them seen in training** |
 | Repeats | every number below is the mean ± sd over 3 seeds |
 
+## Architecture
+
+The path a network flow takes to become a number in this README:
+
+```mermaid
+flowchart TB
+    CSV["8 CICIDS2017 CSV files<br/>2,827,876 flows"] --> Rep["Six documented defects repaired<br/>column names, latin-1 bytes,<br/>12-hour timestamps with no AM/PM"]
+    Rep --> Feat["78 numeric features<br/>IPs, ports and Flow ID excluded"]
+    Feat --> Win["Windows of 16 consecutive flows<br/>per monitored host, per day"]
+
+    Win --> Tr["Train: Mon to Wed<br/>82,968 windows"]
+    Win --> Ca["Calibration: Thursday<br/>sets the alert threshold"]
+    Win --> Te["Test: Friday<br/>attack types never seen in training"]
+
+    Tr --> Mod
+    Ca --> Mod
+    Te --> Mod
+
+    Mod["Elman · window MLP · wide MLP<br/>last-flow MLP · logistic regression<br/>matched parameter budget"] --> Res["Pooled result<br/>3 seeds, mean and spread"]
+
+    Res --> C1["Control 1<br/>metrics computed within each host"]
+    Res --> C2["Control 2<br/>flow order shuffled inside the window"]
+    Res --> C3["Control 3<br/>instrument check on a planted signal"]
+```
+
+| Stage | What happens | Why it matters |
+|---|---|---|
+| Repair | Six defects in the published CSVs are fixed, each with a test | Without it the file barely loads, and two of them corrupt time itself |
+| Features | IPs, ports, `Flow ID` and timestamp leave the matrix | In this capture the attacker's IP **is** the label |
+| Sequences | 16 consecutive flows from one host, on one day | Grouping by host stops the network learning "what time of day is it"; never crossing a day stops the split from leaking |
+| Split | Chronological, by weekday | Each day holds different attacks, so the test measures generalisation to unseen types |
+| Models | Five, at a matched parameter budget | Isolates architecture from capacity |
+| Controls | Three, applied to the result | This is what separates detection from recognition, and signal from noise |
+
+### The Elman network
+
+The context layer holds the hidden activation from the previous step and feeds it
+back as extra input. Its sibling, the Jordan network, feeds back the *output*
+layer instead — the difference is where the dotted arrow starts:
+
+```mermaid
+flowchart LR
+    X["x_t<br/>flow features at step t"] --> H["Hidden layer<br/>h_t = tanh(Wx·x_t + Wh·h_t-1 + b)"]
+    H --> Y["Output<br/>P(attack in the window)"]
+    H --> Ctx["Context layer<br/>holds h_t-1"]
+    Ctx -. "feeds back into the hidden layer" .-> H
+    Y -. "a Jordan network would feed back from here" .-> Ctx
+```
+
+### The shortcut the controls hunt for
+
+Almost every attack in CICIDS2017 leaves one host and lands on one server. That
+opens a path by which a model scores well while detecting nothing:
+
+```mermaid
+flowchart TB
+    Q["A window of 16 flows<br/>arriving at one server"] --> A{"Did the model get it right by reading the traffic<br/>or by recognising the host?"}
+    A -->|"measured across all hosts"| P["PR-AUC 0.31 to 0.55<br/>looks like detection"]
+    A -->|"measured within each host"| W["ROC-AUC at chance<br/>on nearly every server"]
+    P --> D["The gap between the two numbers<br/>is the size of the identity shortcut"]
+    W --> D
+```
+
 ## Results
 
 PR-AUC on the unseen-attack test day. The prevalence floor — what a detector
