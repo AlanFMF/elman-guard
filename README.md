@@ -1,7 +1,7 @@
 <h1 align="center">ElmanGuard</h1>
 
 <p align="center">
-  <strong>Sequence-based intrusion detection with a classic Elman recurrent network — and the controls that say whether it is really detecting anything.</strong>
+  <strong>Detecção de intrusões por sequências com uma rede recorrente de Elman — e os controles que dizem se ela está mesmo detectando alguma coisa.</strong>
 </p>
 
 <p align="center">
@@ -9,202 +9,205 @@
   <img alt="TensorFlow" src="https://img.shields.io/badge/TensorFlow-2.21-ff6f00?logo=tensorflow&logoColor=white">
   <img alt="Streamlit" src="https://img.shields.io/badge/Streamlit-app-ff4b4b?logo=streamlit&logoColor=white">
   <img alt="Dataset" src="https://img.shields.io/badge/dataset-CICIDS2017-1baf7a">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-2a78d6">
+  <img alt="License" src="https://img.shields.io/badge/licença-MIT-2a78d6">
 </p>
 
-<p align="center"><a href="README.pt-br.md">🇧🇷 Leia em português</a></p>
+<p align="center"><a href="README.en.md">🇺🇸 Read in English</a></p>
 
 ---
 
-An Elman network reads a window of 16 consecutive network flows arriving at a
-monitored server and predicts whether that window contains an attack. Trained on
-Monday–Wednesday of CICIDS2017, thresholded on Thursday, evaluated on Friday —
-whose attack types it has never seen.
+Uma rede de Elman lê uma janela de 16 fluxos de rede consecutivos chegando em um
+servidor monitorado e prevê se aquela janela contém um ataque. Treinada de
+segunda a quarta do CICIDS2017, com limiar definido na quinta e avaliada na
+sexta — cujos tipos de ataque ela nunca viu.
 
-The point of the repository is not the detector. It is the four controls around
-it, and what they reveal.
+O ponto do repositório não é o detector. São os quatro controles em volta dele, e
+o que eles revelam.
 
-## Three findings
+## Três achados
 
-**1 · Temporal order carries no measurable signal here — and that null is credible.**
-Shuffling the flows inside every window destroys the order while keeping the
-contents. The Elman's PR-AUC falls by **0.055**; the seed-to-seed standard
-deviation of the same measurement is **0.117**. The effect is smaller than the
-noise. What makes this worth stating is the instrument check below: the same
-harness detects a *planted* temporal signal at PR-AUC 0.985.
+**1 · A ordem temporal não carrega sinal mensurável aqui — e esse nulo é crível.**
+Embaralhar os fluxos dentro de cada janela destrói a ordem e preserva o conteúdo.
+O PR-AUC do Elman cai **0,055**; o desvio-padrão da mesma medida entre sementes é
+**0,117**. O efeito é menor que o ruído. O que torna isso digno de ser afirmado é
+a aferição do instrumento, abaixo: o mesmo harness detecta um sinal temporal
+*plantado* com PR-AUC 0,985.
 
-**2 · Most of the apparent skill is host recognition, not attack detection.**
-Pooled across servers the models reach PR-AUC 0.31–0.55. Computed *inside* each
-host — where "which machine is this" carries no information — every neural model
-sits at or below chance on every host. Only a logistic regression on the single
-heavily attacked server clears it, at ROC-AUC 0.694.
+**2 · A maior parte do desempenho aparente é reconhecimento de host, não detecção de ataque.**
+Agregados entre servidores, os modelos chegam a PR-AUC 0,31–0,55. Calculados
+*dentro* de cada host — onde "qual máquina é esta" não carrega informação —
+todos os modelos neurais ficam no acaso ou abaixo dele, em todos os hosts. Só uma
+regressão logística no único servidor pesadamente atacado supera o acaso, com
+ROC-AUC 0,694.
 
-**3 · A linear model beats every neural architecture, and the four networks are
-indistinguishable from each other.**
+**3 · Um modelo linear vence todas as arquiteturas neurais, e as quatro redes são
+indistinguíveis entre si.**
 
-![Architecture comparison](assets/architecture_comparison.png)
+![Comparação de arquiteturas](assets/architecture_comparison.png)
 
 <details>
-<summary><strong>The app</strong> (click to expand)</summary>
+<summary><strong>O app</strong> (clique para expandir)</summary>
 
-![Streamlit app](assets/app_screenshot.png)
+![App Streamlit](assets/app_screenshot.png)
 
-The test day at the attacked server. The whole day is shaded because 98.6% of its
-windows contain attack traffic — and the model's probability spends long stretches
-near zero inside it. That picture is the within-host control, drawn.
+O dia de teste no servidor atacado. O dia inteiro está sombreado porque 98,6% das
+suas janelas contêm tráfego de ataque — e a probabilidade do modelo passa longos
+trechos perto de zero lá dentro. Essa imagem é o controle por host, desenhado.
 
 </details>
 
-## The setup
+## O experimento
 
 | | |
 |---|---|
-| Data | CICIDS2017 `TrafficLabelling`, all 8 day files, **2,827,876 flows** after repair |
-| Features | **78** numeric flow statistics; IPs, ports, `Flow ID` and timestamp excluded |
-| Sample | 16 consecutive flows arriving at one monitored host, on one day |
-| Split | train Mon–Wed (82,968 windows, 3.2% attack) · threshold Thu (29,955, 1.1%) · test Fri (23,858, 8.1%) |
-| Test attacks | PortScan, DDoS, Bot — **none of them seen in training** |
-| Repeats | every number below is the mean ± sd over 3 seeds |
+| Dados | CICIDS2017 `TrafficLabelling`, os 8 arquivos, **2.827.876 fluxos** após reparo |
+| Features | **78** estatísticas numéricas de fluxo; IPs, portas, `Flow ID` e timestamp excluídos |
+| Amostra | 16 fluxos consecutivos chegando em um host monitorado, em um mesmo dia |
+| Divisão | treino seg–qua (82.968 janelas, 3,2% ataque) · limiar qui (29.955, 1,1%) · teste sex (23.858, 8,1%) |
+| Ataques do teste | PortScan, DDoS, Bot — **nenhum deles visto no treino** |
+| Repetições | todo número abaixo é média ± desvio sobre 3 sementes |
 
-## Results
+## Resultados
 
-PR-AUC on the unseen-attack test day. The prevalence floor — what a detector
-that flags everything would score — is 0.081.
+PR-AUC no dia de teste com ataques inéditos. O piso de prevalência — o que um
+detector que alerta em tudo obteria — é 0,081.
 
-| model | PR-AUC | ROC-AUC | recall @ 1% FPR | precision | params |
+| modelo | PR-AUC | ROC-AUC | recall a 1% FPR | precisão | params |
 |---|---|---|---|---|---|
-| **logistic regression** | **0.546** | 0.775 | **0.468** | 0.825 | 19,969 |
-| window MLP (wide) | 0.349 ± 0.008 | 0.601 | 0.258 ± 0.019 | 0.822 | 80,001 |
-| window MLP | 0.347 ± 0.050 | 0.603 | 0.155 ± 0.124 | 0.841 | 8,751 |
-| **Elman RNN** | 0.341 ± 0.117 | 0.638 | 0.177 ± 0.097 | 0.815 | 9,217 |
-| last-flow MLP | 0.309 ± 0.020 | 0.758 | 0.174 ± 0.056 | 0.767 | 9,201 |
-| prevalence floor | 0.081 | 0.500 | — | 0.081 | — |
+| **regressão logística** | **0,546** | 0,775 | **0,468** | 0,825 | 19.969 |
+| MLP da janela (larga) | 0,349 ± 0,008 | 0,601 | 0,258 ± 0,019 | 0,822 | 80.001 |
+| MLP da janela | 0,347 ± 0,050 | 0,603 | 0,155 ± 0,124 | 0,841 | 8.751 |
+| **Elman RNN** | 0,341 ± 0,117 | 0,638 | 0,177 ± 0,097 | 0,815 | 9.217 |
+| MLP do último fluxo | 0,309 ± 0,020 | 0,758 | 0,174 ± 0,056 | 0,767 | 9.201 |
+| piso de prevalência | 0,081 | 0,500 | — | 0,081 | — |
 
-The four neural models span 0.309 to 0.349 — a range narrower than the Elman's
-own standard deviation across seeds. **Any paper reporting that its RNN beats an
-MLP by two points on CICIDS2017 is reporting the seed.**
+Os quatro modelos neurais vão de 0,309 a 0,349 — uma faixa mais estreita que o
+próprio desvio-padrão do Elman entre sementes. **Qualquer artigo que reporte que
+sua RNN vence um MLP por dois pontos no CICIDS2017 está reportando a semente.**
 
-Recall by attack type tells you where the 0.55 comes from:
+O recall por tipo de ataque mostra de onde vem o 0,55:
 
-| attack (unseen) | Elman | window MLP | logistic |
+| ataque (inédito) | Elman | MLP da janela | logística |
 |---|---|---|---|
-| DDoS | 0.530 | 0.684 | 0.808 |
-| PortScan | 0.000 | 0.000 | 0.431 |
-| Bot | 0.000 | 0.000 | 0.036 |
+| DDoS | 0,530 | 0,684 | 0,808 |
+| PortScan | 0,000 | 0,000 | 0,431 |
+| Bot | 0,000 | 0,000 | 0,036 |
 
-DDoS transfers because the training days are full of DoS. PortScan and Bot do
-not transfer at all for the neural models. This is what "generalises to unseen
-attack types" actually looks like.
+O DDoS transfere porque os dias de treino são cheios de DoS. PortScan e Bot não
+transferem nada para os modelos neurais. É assim que "generalizar para tipos de
+ataque inéditos" se parece de verdade.
 
-## The controls
+## Os controles
 
-### 1 · Within-host: how much is recognition?
+### 1 · Dentro do host: quanto é reconhecimento?
 
-Pooled across servers, a model can score well simply by learning *which machines
-get attacked* — in this capture the web server is under attack 95% of the week
-and the other hosts essentially never are. Inside one host that information is
-constant, so within-host numbers measure detection.
+Agregado entre servidores, um modelo pode pontuar bem apenas aprendendo *quais
+máquinas são atacadas* — nesta captura o servidor web está sob ataque em 95% da
+semana e os demais praticamente nunca. Dentro de um host essa informação é
+constante, então os números por host medem detecção.
 
-ROC-AUC, test day, per monitored host (0.5 = chance):
+ROC-AUC, dia de teste, por host monitorado (0,5 = acaso):
 
-| host | attack rate | Elman | window MLP | logistic |
+| host | taxa de ataque | Elman | MLP da janela | logística |
 |---|---|---|---|---|
-| 192.168.10.50 | 98.6% | 0.561 | 0.451 | **0.694** |
-| 192.168.10.9 | 13.8% | 0.426 | 0.399 | 0.509 |
-| 192.168.10.15 | 8.0% | 0.483 | 0.340 | 0.328 |
-| 192.168.10.5 | 4.9% | 0.417 | 0.360 | 0.415 |
-| 192.168.10.14 | 4.3% | 0.316 | 0.192 | 0.303 |
-| 192.168.10.8 | 3.5% | 0.464 | 0.266 | 0.341 |
-| 205.174.165.73 | 56.9% | 0.220 | 0.100 | 0.195 |
+| 192.168.10.50 | 98,6% | 0,561 | 0,451 | **0,694** |
+| 192.168.10.9 | 13,8% | 0,426 | 0,399 | 0,509 |
+| 192.168.10.15 | 8,0% | 0,483 | 0,340 | 0,328 |
+| 192.168.10.5 | 4,9% | 0,417 | 0,360 | 0,415 |
+| 192.168.10.14 | 4,3% | 0,316 | 0,192 | 0,303 |
+| 192.168.10.8 | 3,5% | 0,464 | 0,266 | 0,341 |
+| 205.174.165.73 | 56,9% | 0,220 | 0,100 | 0,195 |
 
-Read across: **the pooled PR-AUC of 0.34–0.55 is very largely host identity.**
-Strip it out and one cell in the table beats chance.
+Lendo a tabela: **o PR-AUC agregado de 0,34–0,55 é em grande parte identidade de
+host.** Tirando isso, uma única célula supera o acaso.
 
-### 2 · Order shuffle: is the recurrence earning its place?
+### 2 · Embaralhamento da ordem: a recorrência se paga?
 
-| model | PR-AUC ordered | PR-AUC shuffled | drop | seed sd |
+| modelo | PR-AUC ordenado | PR-AUC embaralhado | queda | desvio entre sementes |
 |---|---|---|---|---|
-| Elman RNN | 0.341 ± 0.117 | 0.286 ± 0.039 | 0.055 | 0.117 |
-| window MLP | 0.347 ± 0.050 | 0.305 ± 0.024 | 0.042 | 0.050 |
+| Elman RNN | 0,341 ± 0,117 | 0,286 ± 0,039 | 0,055 | 0,117 |
+| MLP da janela | 0,347 ± 0,050 | 0,305 ± 0,024 | 0,042 | 0,050 |
 
-Both drops are smaller than the run-to-run spread. At the flow-window level on
-this capture, the order of flows is not carrying information the models can use.
+As duas quedas são menores que a dispersão entre execuções. No nível de janela de
+fluxos desta captura, a ordem não carrega informação que os modelos consigam usar.
 
-### 3 · The instrument check — the control that saved the project
+### 3 · A aferição do instrumento — o controle que salvou o projeto
 
-A null result is worthless unless the instrument can detect a positive one.
-`synthetic.order_only_dataset` builds windows where **order is the only signal**:
-every window comes from the same AR(1) process, negatives are the same values
-permuted in time, so mean, variance, min, max and even the last-step distribution
-are identical between classes.
+Um resultado nulo não vale nada se o instrumento não é capaz de detectar um
+positivo. O `synthetic.order_only_dataset` monta janelas em que **a ordem é o
+único sinal**: toda janela vem do mesmo processo AR(1), e as negativas são os
+mesmos valores permutados no tempo — então média, variância, mínimo, máximo e até
+a distribuição do último passo são idênticas entre as classes.
 
-| configuration | PR-AUC on the order-only probe |
+| configuração | PR-AUC na sonda de ordem pura |
 |---|---|
-| earlier default (48 units, dropout 0.3, lr 1e-3) | **0.483** — chance |
-| current default (64 units, dropout 0.2, lr 3e-3) | **0.985** |
+| padrão anterior (48 units, dropout 0,3, lr 1e-3) | **0,483** — acaso |
+| padrão atual (64 units, dropout 0,2, lr 3e-3) | **0,985** |
 
-The first configuration would have produced a confident, published, and
-completely false conclusion: *"the recurrence adds nothing."* It was not a
-finding, it was an undertrained network. The probe is now a test
-(`tests/test_harness_detects_planted_signal.py`) that fails if the harness ever
-loses the ability to see a temporal effect.
+A primeira configuração teria produzido uma conclusão confiante, publicada e
+completamente falsa: *"a recorrência não acrescenta nada"*. Não era um achado,
+era uma rede subtreinada. A sonda hoje é um teste
+(`tests/test_harness_detects_planted_signal.py`) que falha se o harness perder a
+capacidade de enxergar um efeito temporal.
 
-A second reproducibility bug surfaced the same way: seeding inside `fit` but not
-before the weights were built made two runs of the same configuration differ by
-more than 0.25 PR-AUC. Hence three seeds on every number.
+Um segundo bug de reprodutibilidade apareceu do mesmo jeito: semear dentro do
+`fit`, mas não antes de os pesos serem criados, fazia duas execuções da mesma
+configuração diferirem em mais de 0,25 de PR-AUC. Daí três sementes em todo
+número.
 
-### 4 · Grouping by source instead of destination
+### 4 · Agrupar por origem em vez de destino
 
-Nearly every attack flow in CICIDS2017 comes from one host, `172.16.0.1`, whose
-traffic is **99.4% attack**. Group sequences by source and the question silently
-becomes "is this the attacker's machine". Measured, single run:
+Quase todo fluxo de ataque do CICIDS2017 parte de um host, `172.16.0.1`, cujo
+tráfego é **99,4% ataque**. Agrupar as sequências por origem transforma a pergunta,
+silenciosamente, em "esta é a máquina do atacante?". Medido, execução única:
 
-| grouping | PR-AUC | precision |
+| agrupamento | PR-AUC | precisão |
 |---|---|---|
-| by destination (monitored server) | 0.470 | 0.815 |
-| by source | 0.291 | **1.000** |
+| por destino (servidor monitorado) | 0,470 | 0,815 |
+| por origem | 0,291 | **1,000** |
 
-I expected source-grouping to inflate PR-AUC and it did not; what it does is push
-precision to a perfect 1.000, which is the fingerprint of a model that has found
-an identity shortcut and fires only when it is certain. Reported as measured
-rather than as predicted.
+Eu esperava que agrupar por origem inflasse o PR-AUC, e não inflou; o que ele faz
+é empurrar a precisão para 1,000 exatos, que é a assinatura de um modelo que
+achou um atalho de identidade e só dispara quando tem certeza. Reportado como
+medido, não como previsto.
 
-## Method
+## Método
 
-Full detail in [`docs/how_it_works.en.md`](docs/how_it_works.en.md). The short
-version:
+Detalhe completo em [`docs/how_it_works.pt.md`](docs/how_it_works.pt.md). Em resumo:
 
-**The parser fixes six documented defects** in the published CSVs — leading
-spaces in 70 of 85 column names, latin-1 bytes in the web-attack labels, header
-rows spliced mid-file, 288,602 empty padding rows, 12-hour timestamps with no
-AM/PM marker (`1:02` is 13:02), and an ambiguous day/month order resolved by
-checking the weekday against the filename. Each one has a test.
+**O parser corrige seis defeitos documentados** dos CSVs publicados — espaços à
+esquerda em 70 dos 85 nomes de coluna, bytes latin-1 nos rótulos de web attack,
+linhas de cabeçalho no meio do arquivo, 288.602 linhas vazias de preenchimento,
+timestamps de 12 horas sem marcador AM/PM (`1:02` é 13:02) e ordem dia/mês
+ambígua, resolvida conferindo o dia da semana contra o nome do arquivo. Cada um
+tem teste.
 
-**Duplicate rows are kept, deliberately.** De-duplicating is the standard advice
-and it comes from the row-classification framing. Here the split is chronological
-so duplicates cannot straddle it — and a brute force *is* a run of near-identical
-flows. Removing them would delete the signal. The count is reported instead.
+**Linhas duplicadas são mantidas, de propósito.** Remover duplicatas é o conselho
+padrão e vem do enquadramento de classificação de linhas. Aqui a divisão é
+cronológica, então duplicatas não atravessam a fronteira — e uma força bruta *é*
+uma sequência de fluxos quase idênticos. Removê-las apagaria o sinal. A contagem
+é reportada em vez disso.
 
-**Windows never cross a host or a day**, so the weekday split cannot put the same
-flows on both sides.
+**Janelas nunca cruzam host nem dia**, então o split por dia da semana não pode
+colocar os mesmos fluxos dos dois lados.
 
-**Every architecture gets a matched parameter budget**, because a flattened
-16-step window is 16× wider than one step and an unmatched dense layer would win
-on capacity rather than on architecture. `window_mlp_wide` is the deliberately
-over-provisioned control at 9× the parameters.
+**Toda arquitetura recebe orçamento de parâmetros equivalente**, porque uma janela
+achatada de 16 passos é 16× mais larga que um passo e uma camada densa sem esse
+ajuste venceria por capacidade, não por arquitetura. O `window_mlp_wide` é o
+controle deliberadamente superdimensionado, com 9× os parâmetros.
 
-**Early stopping watches held-out windows from the training days**, not the
-calibration day. Each weekday holds different attacks, so a validation signal
-from another day measures transfer, not convergence, and training stops on noise.
+**O early stopping observa janelas retidas dos dias de treino**, não o dia de
+calibração. Cada dia da semana tem ataques diferentes, então um sinal de validação
+de outro dia mede transferência, não convergência, e o treino para no ruído.
 
 ```
-Input (16, 78) → SimpleRNN(64, tanh) → Dropout(0.2) → Dense(1, sigmoid)
-9,217 parameters · binary cross-entropy · Adam 3e-3 · class-weighted
+Entrada (16, 78) → SimpleRNN(64, tanh) → Dropout(0,2) → Dense(1, sigmoid)
+9.217 parâmetros · entropia cruzada binária · Adam 3e-3 · com peso de classe
 ```
 
-## Run it
+## Como rodar
 
-CICIDS2017 is not redistributable, so the raw capture is not in the repository.
+O CICIDS2017 não é redistribuível, então a captura bruta não está no repositório.
 
 ```bash
 git clone https://github.com/AlanFMF/elman-guard.git
@@ -212,55 +215,58 @@ cd elman-guard
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-pytest -m "not slow"        # 22 tests, no dataset needed
-pytest                      # adds the instrument checks (trains small models)
+pytest -m "not slow"        # 22 testes, sem precisar do dataset
+pytest                      # inclui as aferições do instrumento (treina modelos pequenos)
 ```
 
-With the data (download `GeneratedLabelledFlows.zip` from the
-[CIC](https://www.unb.ca/cic/datasets/ids-2017.html) — **not** the
-`MachineLearningCVE` version, which has the IP and timestamp columns stripped
-and cannot be sequenced):
+Com os dados (baixe o `GeneratedLabelledFlows.zip` do
+[CIC](https://www.unb.ca/cic/datasets/ids-2017.html) — **não** a versão
+`MachineLearningCVE`, que teve as colunas de IP e timestamp removidas e não
+permite formar sequências):
 
 ```bash
-python scripts/prepare_data.py --raw path/to/TrafficLabelling --out data/processed
+python scripts/prepare_data.py --raw caminho/para/TrafficLabelling --out data/processed
 python scripts/run_experiment.py --split chronological --seeds 0 1 2
-python scripts/run_experiment.py --split random --seeds 0 1 2   # the inflated protocol
+python scripts/run_experiment.py --split random --seeds 0 1 2   # o protocolo inflado
 python scripts/export_demo.py
 python scripts/make_figures.py
 streamlit run app.py
 ```
 
-The app is bilingual and shows the attack probability through the test day for a
-chosen server, with the ground-truth attack periods shaded, alongside all of the
-measured results above.
+O app é bilíngue e mostra a probabilidade de ataque ao longo do dia de teste para
+um servidor escolhido, com os períodos de ataque reais sombreados, ao lado de
+todos os resultados medidos acima.
 
-## Limitations
+## Limitações
 
-- **One week, one testbed, 2017.** The traffic is generated, the attacks are
-  scripted, and the topology is fixed. Nothing here transfers to a real network
-  without re-measurement.
-- **Known dataset defects.** Beyond the six the parser repairs, published work
-  documents labelling errors and a flow-construction bug in the CICFlowMeter
-  release used to build these CSVs. A corrected re-release exists; this project
-  uses the original, so its absolute numbers carry that caveat.
-- **The window is 16 flows.** A slow attack spread over hours may simply not fit
-  inside the context. Longer windows were not swept.
-- **Three seeds** is enough to show the gaps are noise, not enough to resolve
-  small real differences.
-- **Only the chronological and random protocols** were compared. Host-disjoint
-  splitting is impossible here: one machine sends nearly all attack traffic.
+- **Uma semana, um testbed, 2017.** O tráfego é gerado, os ataques são
+  roteirizados e a topologia é fixa. Nada aqui transfere para uma rede real sem
+  nova medição.
+- **Defeitos conhecidos do dataset.** Além dos seis que o parser corrige, há
+  trabalho publicado documentando erros de rotulagem e um bug de construção de
+  fluxos no CICFlowMeter usado para gerar estes CSVs. Existe uma re-publicação
+  corrigida; este projeto usa a original, então os números absolutos carregam essa
+  ressalva.
+- **A janela tem 16 fluxos.** Um ataque lento espalhado por horas pode
+  simplesmente não caber no contexto. Janelas maiores não foram varridas.
+- **Três sementes** bastam para mostrar que as diferenças são ruído, mas não para
+  resolver diferenças reais pequenas.
+- **Só os protocolos cronológico e aleatório** foram comparados. Divisão disjunta
+  por host é impossível aqui: uma única máquina envia quase todo o tráfego de
+  ataque.
 
-### What I would try next
+### O que eu tentaria a seguir
 
-Longer and multi-scale windows; a per-host baseline model so the score is
-"unusual *for this server*" rather than "unusual"; and the corrected CICIDS2017
-re-release, to see which of these findings survive better labels.
+Janelas mais longas e multiescala; um modelo de linha de base por host, para que
+a pontuação seja "incomum *para este servidor*" em vez de "incomum"; e a
+re-publicação corrigida do CICIDS2017, para ver quais destes achados sobrevivem a
+rótulos melhores.
 
-## ⚠️ Disclaimer
+## ⚠️ Aviso
 
-A research demonstration of evaluation methodology for sequence models, **not** a
-production intrusion detection system. Do not deploy it on a real network.
+Demonstração de pesquisa sobre metodologia de avaliação de modelos sequenciais,
+**não** um sistema de detecção de intrusões de produção. Não implante em rede real.
 
-## License
+## Licença
 
-MIT — see [LICENSE](LICENSE).
+MIT — veja [LICENSE](LICENSE).

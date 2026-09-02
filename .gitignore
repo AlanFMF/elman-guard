@@ -16,3 +16,6 @@ data/*.csv
 
 # Personal setup notes (contains local paths) — kept out of the public repo.
 COMECE_AQUI.md
+
+# Local tooling: a symlink into this machine's skill folder, meaningless elsewhere.
+.agents/
