@@ -1,0 +1,11 @@
+# Pinned to the exact versions the reported experiment was run with.
+tensorflow-cpu==2.21.0
+scikit-learn==1.8.0
+pandas==3.0.2
+numpy==2.4.4
+pyarrow==22.0.0
+streamlit==1.63.0
+plotly==7.0.0
+
+# Only needed to regenerate the README figures (scripts/make_figures.py)
+matplotlib==3.10.9

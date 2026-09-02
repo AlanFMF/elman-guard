@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+.pytest_cache/
+.DS_Store
+logs/
+*.egg-info/
+
+# The raw capture is ~1.2 GB and must be downloaded from the CIC, not committed.
+data/raw/
+data/processed/
+data/*.csv
+
+# Personal setup notes (contains local paths) — kept out of the public repo.
+COMECE_AQUI.md
