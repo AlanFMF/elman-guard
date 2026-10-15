@@ -70,3 +70,14 @@ def test_day_split_is_disjoint(data):
 def test_random_split_partitions_everything(data):
     tr, ca, te = split_random(data, seed=0)
     assert len(tr) + len(ca) + len(te) == len(data)
+
+
+def test_shuffle_is_reproducible_and_matches_the_original_algorithm(data):
+    """The memory-saving rewrite must draw the very same permutations."""
+    rng = np.random.default_rng(5)
+    expected = data.X.copy()
+    for i in range(len(expected)):
+        expected[i] = expected[i][rng.permutation(expected.shape[1])]
+    got = shuffle_within_windows(data, seed=5)
+    assert np.array_equal(got.X, expected)
+    assert np.array_equal(got.flow_start, data.flow_start)

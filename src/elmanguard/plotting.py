@@ -125,3 +125,34 @@ def comparison_figure(summary: pd.DataFrame, labels: dict[str, str], dark: bool 
         **_axes(c, "", "PR-AUC"),
     )
     return fig
+
+
+BLUE_RAMP = ["#fcfcfb", "#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
+BLUE_RAMP_DARK = ["#1a1a19", "#0d366b", "#184f95", "#256abf", "#2a78d6", "#3987e5", "#6da7ec", "#9ec5f4"]
+
+
+def confusion_heatmap(cm: pd.DataFrame, labels: dict[str, str], dark: bool = False):
+    """Row-normalised confusion matrix: one hue, light to dark, values on the cells."""
+    import plotly.graph_objects as go
+
+    c = palette(dark)
+    ramp = BLUE_RAMP_DARK if dark else BLUE_RAMP
+    z = cm.to_numpy()
+    text = [[f"{v:.0%}" if v >= 0.005 else "" for v in row] for row in z]
+    fig = go.Figure(go.Heatmap(
+        z=z, x=list(cm.columns), y=list(cm.index), zmin=0, zmax=1,
+        colorscale=[[i / (len(ramp) - 1), col] for i, col in enumerate(ramp)],
+        text=text, texttemplate="%{text}", textfont=dict(size=11),
+        hovertemplate=f"{labels.get('true', 'true')}: %{{y}}<br>"
+                      f"{labels.get('pred', 'predicted')}: %{{x}}<br>%{{z:.1%}}<extra></extra>",
+        showscale=False, xgap=2, ygap=2,
+    ))
+    fig.update_layout(
+        paper_bgcolor=c["surface"], plot_bgcolor=c["surface"],
+        margin=dict(l=0, r=8, t=8, b=0), height=max(360, 34 * len(cm) + 120),
+        xaxis=dict(title_text=labels.get("pred", ""), tickangle=-35, automargin=True,
+                   tickfont=dict(color=c["ink_soft"], size=11), title_font=dict(color=c["ink_soft"])),
+        yaxis=dict(title_text=labels.get("true", ""), autorange="reversed", automargin=True,
+                   tickfont=dict(color=c["ink_soft"], size=11), title_font=dict(color=c["ink_soft"])),
+    )
+    return fig

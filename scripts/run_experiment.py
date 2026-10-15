@@ -7,6 +7,14 @@ Produces, in order: the pooled comparison of four architectures plus a linear
 baseline, the within-host control, the temporal-order ablation, and the
 source-vs-destination grouping experiment that measures the attacker-fingerprint
 shortcut.
+
+Three evaluation protocols, selected with ``--split``:
+
+* ``chronological`` -- train Mon-Wed, threshold Thu, test Fri. Unseen attack types.
+* ``temporal``      -- each attack burst cut in time, with a flow-level embargo.
+                       Known attack types, no flow shared across splits.
+* ``random``        -- shuffled windows. The common protocol, kept to measure
+                       how much it inflates.
 """
 
 from __future__ import annotations
@@ -24,7 +32,10 @@ from elmanguard.config import DEFAULT, Config  # noqa: E402
 from elmanguard.evaluate import within_host  # noqa: E402
 from elmanguard.experiments import order_ablation, repeat_over_seeds, run_experiment  # noqa: E402
 from elmanguard.features import select_features  # noqa: E402
-from elmanguard.sequences import build_sequences, split_by_day, split_random  # noqa: E402
+from elmanguard.experiments import NEURAL_MODELS  # noqa: E402
+from elmanguard.sequences import (  # noqa: E402
+    build_sequences, shared_flow_fraction, split_by_day, split_random, split_temporal,
+)
 
 
 def load_processed(directory: Path) -> pd.DataFrame:
@@ -35,9 +46,17 @@ def load_processed(directory: Path) -> pd.DataFrame:
     return df.sort_values("timestamp", kind="stable").reset_index(drop=True)
 
 
+SPLITTERS = {
+    "chronological": lambda w, cfg: split_by_day(w, cfg),
+    "temporal": lambda w, cfg: split_temporal(w),
+    "random": lambda w, cfg: split_random(w),
+}
+OUT_DIRS = {"chronological": "", "temporal": "temporal_split", "random": "random_split"}
+
+
 def make_splits(df: pd.DataFrame, cfg: Config, features: list[str], how: str = "chronological"):
     windows = build_sequences(df, features, cfg, stride=cfg.stride_train)
-    return split_by_day(windows, cfg) if how == "chronological" else split_random(windows)
+    return SPLITTERS[how](windows, cfg)
 
 
 def main() -> None:
@@ -45,11 +64,14 @@ def main() -> None:
     ap.add_argument("--processed", type=Path, default=Path("data/processed"))
     ap.add_argument("--out", type=Path, default=Path("reports"))
     ap.add_argument("--skip-grouping-experiment", action="store_true")
-    ap.add_argument("--split", choices=["chronological", "random"], default="chronological")
+    ap.add_argument("--split", choices=list(SPLITTERS), default="chronological")
     ap.add_argument("--seeds", nargs="*", type=int, default=[0, 1, 2])
+    ap.add_argument("--models", nargs="*", default=list(NEURAL_MODELS))
+    ap.add_argument("--skip-ablation", action="store_true")
     args = ap.parse_args()
-    args.out = args.out if args.split == "chronological" else args.out / "random_split"
+    args.out = args.out / OUT_DIRS[args.split] if OUT_DIRS[args.split] else args.out
     args.out.mkdir(parents=True, exist_ok=True)
+    models = tuple(args.models)
 
     cfg = DEFAULT
     print("Loading prepared flows ...")
@@ -64,17 +86,20 @@ def main() -> None:
         kinds = sorted(set(d.attack_type)) if len(d) else []
         print(f"  {name:6s} {len(d):>7,} windows · {d.positive_rate:6.2%} attack · "
               f"{len(set(d.host))} hosts · types={[k for k in kinds if k != 'BENIGN']}")
+    leak = shared_flow_fraction(te, tr)
+    print(f"  test windows sharing at least one flow with training: {leak:.1%}")
 
     print(f"\n=== 1. Pooled comparison over {len(args.seeds)} seeds (all monitored hosts) ===")
-    summary, allruns = repeat_over_seeds(tr, ca, te, cfg, seeds=tuple(args.seeds))
+    summary, allruns, result = repeat_over_seeds(
+        tr, ca, te, cfg, models=models, seeds=tuple(args.seeds), return_first=True
+    )
     summary.to_csv(args.out / "pooled_results.csv")
     allruns.to_csv(args.out / "pooled_runs.csv")
     print(summary[["pr_auc_mean", "pr_auc_std", "recall_mean", "recall_std",
                    "precision_mean", "f1_mean"]]
           .to_string(float_format=lambda v: f"{v: .4f}"))
 
-    # One representative run supplies the score vectors for the within-host control.
-    result = run_experiment(tr, ca, te, cfg, verbose=0)
+    # The first seed's run supplies the score vectors for the within-host control.
     result.per_attack.to_csv(args.out / "per_attack_recall.csv")
     print("\nrecall by attack type (test day):")
     print(result.per_attack.to_string(float_format=lambda v: f"{v: .3f}"))
@@ -91,10 +116,11 @@ def main() -> None:
     if frames:
         pd.concat(frames, names=["model"]).to_csv(args.out / "within_host.csv")
 
-    print("\n=== 3. Temporal-order ablation ===")
-    ablation = order_ablation(tr, ca, te, cfg, seeds=tuple(args.seeds))
-    ablation.to_csv(args.out / "order_ablation.csv")
-    print(ablation.to_string(float_format=lambda v: f"{v: .4f}"))
+    if not args.skip_ablation:
+        print("\n=== 3. Temporal-order ablation ===")
+        ablation = order_ablation(tr, ca, te, cfg, seeds=tuple(args.seeds))
+        ablation.to_csv(args.out / "order_ablation.csv")
+        print(ablation.to_string(float_format=lambda v: f"{v: .4f}"))
 
     summary = {
         "n_flows": int(len(df)),
@@ -103,6 +129,10 @@ def main() -> None:
         "windows": {"train": len(tr), "calib": len(ca), "test": len(te)},
         "positive_rate": {"train": tr.positive_rate, "calib": ca.positive_rate,
                           "test": te.positive_rate},
+        "split": args.split,
+        "test_windows_sharing_a_training_flow": leak,
+        "attack_types": {"train": sorted(set(tr.attack_type) - {"BENIGN"}),
+                         "test": sorted(set(te.attack_type) - {"BENIGN"})},
         "config": cfg.to_dict(),
     }
 

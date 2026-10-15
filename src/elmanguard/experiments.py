@@ -130,7 +130,8 @@ def repeat_over_seeds(
     seeds: tuple[int, ...] = (0, 1, 2),
     include_logistic: bool = True,
     verbose: int = 1,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+    return_first: bool = False,
+):
     """Run the comparison once per seed and report mean and spread.
 
     Single-run numbers are not evidence here. Re-initialising the same
@@ -139,22 +140,30 @@ def repeat_over_seeds(
     """
     import dataclasses
 
-    runs = []
+    runs, first = [], None
     for seed in seeds:
         if verbose:
             print(f"· seed {seed}")
+        # The logistic baseline is deterministic -- lbfgs on fixed data returns
+        # the same model every time -- so it is fitted once, on the first seed.
         res = run_experiment(
             train_set, calib_set, test_set,
             dataclasses.replace(cfg, seed=seed),
-            models, include_logistic=include_logistic, verbose=verbose,
+            models, include_logistic=include_logistic and first is None, verbose=verbose,
         )
+        first = first or res
         runs.append(res.results.assign(seed=seed))
 
     allruns = pd.concat(runs)
     cols = ["pr_auc", "roc_auc", "recall", "precision", "f1", "fpr"]
     summary = allruns.groupby(level=0)[cols].agg(["mean", "std"])
     summary.columns = [f"{a}_{b}" for a, b in summary.columns]
+    # Deterministic rows (logistic, prevalence floor) have a single run: their
+    # spread across seeds is zero by construction, not missing.
+    summary = summary.fillna(0.0)
     order = [m for m in list(models) + ["logistic", "prevalence_floor"] if m in summary.index]
+    if return_first:
+        return summary.reindex(order), allruns, first
     return summary.reindex(order), allruns
 
 

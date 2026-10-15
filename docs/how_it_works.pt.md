@@ -66,3 +66,26 @@ equivalente. Só muda a capacidade de usar a ordem:
   harness é rodado em uma sonda onde a ordem é o *único* sinal. Uma configuração
   anterior ficou no acaso ali — e teria produzido um "a recorrência não ajuda"
   confiante e falso. A atual chega a PR-AUC 0,985 nessa sonda.
+
+### 6 · Três protocolos de avaliação
+
+* **Cronológico** — treino de segunda a quarta, limiar na quinta, teste na sexta.
+  Todo tipo de ataque do teste é inédito. É o resultado principal.
+* **Temporal com embargo** — cada rajada de ataque é cortada no tempo (início para
+  treino, fim para teste), e toda janela que compartilha um fluxo através da
+  fronteira é descartada. Tipos conhecidos, fluxos inéditos.
+* **Aleatório** — janelas embaralhadas. Mantido para medir quanto o protocolo
+  usual infla os números, e por quê.
+
+A diferença entre o aleatório e o temporal é o vazamento de fluxos. A diferença
+entre o temporal e o cronológico é o custo de encontrar um tipo de ataque pela
+primeira vez.
+
+### 7 · Multiclasse
+
+Além de "há ataque?", a pergunta "qual ataque?". Usa o protocolo temporal — no
+cronológico o dia de teste só tem tipos nunca vistos, e não dá para nomear uma
+classe que o modelo nunca viu. O limite de janelas é aplicado por tipo de ataque,
+para que tipos minoritários não sumam, e tipos com poucas janelas demais para
+aprender ou avaliar são excluídos e listados. A métrica principal é o F1 macro,
+em que todo tipo pesa igual.

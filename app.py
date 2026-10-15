@@ -22,7 +22,7 @@ import streamlit as st  # noqa: E402
 from elmanguard.config import DEFAULT  # noqa: E402
 from elmanguard.features import FeaturePipeline  # noqa: E402
 from elmanguard.i18n import LANGUAGES, pretty, t  # noqa: E402
-from elmanguard.plotting import comparison_figure, timeline_figure  # noqa: E402
+from elmanguard.plotting import comparison_figure, confusion_heatmap, timeline_figure  # noqa: E402
 
 MODELS = ROOT / "models"
 REPORTS = ROOT / "reports"
@@ -66,7 +66,23 @@ def load_reports():
         "ablation": read("order_ablation.csv", index_col=0),
         "per_attack": read("per_attack_recall.csv", index_col=0),
         "random": read("random_split/pooled_results.csv", index_col=0),
+        "temporal": read("temporal_split/pooled_results.csv", index_col=0),
+        "mc_summary": read("multiclass/summary.csv", index_col=0),
+        "mc_per_class": read("multiclass/per_class_f1.csv", index_col=0),
+        "mc_cm": read("multiclass/confusion_elman.csv", index_col=0),
+        "mc_ablation": read("multiclass/order_ablation.csv", index_col=0),
     }
+
+
+@st.cache_data(show_spinner=False)
+def load_json(name):
+    p = REPORTS / name
+    return json.loads(p.read_text()) if p.exists() else None
+
+
+def pretty_label(lang: str, key: str) -> str:
+    return {"en": {"true": "true type", "pred": "predicted"},
+            "pt": {"true": "tipo real", "pred": "previsto"}}[lang][key]
 
 
 lang = LANGUAGES[st.sidebar.selectbox("Language / Idioma", list(LANGUAGES), index=1)]
@@ -157,18 +173,46 @@ else:
                    "Recall por tipo de ataque — todos os tipos abaixo são inéditos no treino.")
         st.dataframe(pretty(reports["per_attack"], lang), width="stretch")
 
-    if reports["random"] is not None:
-        delta = (reports["random"]["pr_auc_mean"] - reports["pooled"]["pr_auc_mean"]).dropna()
-        st.info(
-            ("**A random split would report much more.** Same data, same models, "
-             "shuffled instead of chronological: PR-AUC rises by "
-             if lang == "en" else
-             "**Um split aleatório reportaria muito mais.** Mesmos dados, mesmos modelos, "
-             "embaralhado em vez de cronológico: o PR-AUC sobe em ")
-            + ", ".join(f"{m} +{v:.3f}" for m, v in delta.items() if m != "prevalence_floor")
-            + ("." ),
-            icon="⚠️",
+
+if reports["random"] is not None and reports["temporal"] is not None and reports["pooled"] is not None:
+    st.subheader(t(lang, "protocols_title"))
+    st.markdown(t(lang, "protocols_intro"))
+    names = t(lang, "protocol_names").split("|")
+    frames = [reports["random"], reports["temporal"], reports["pooled"]]
+    models = [m for m in ("elman", "window_mlp", "logistic") if all(m in f.index for f in frames)]
+    ladder = pd.DataFrame({n: f.loc[models + ["prevalence_floor"], "pr_auc_mean"] for n, f in zip(names, frames)})
+    st.dataframe(pretty(ladder, lang).style.format("{:.3f}"), width="stretch")
+    leaks = [load_json(p) for p in ("random_split/summary.json", "temporal_split/summary.json", "summary.json")]
+    leak_txt = " · ".join(
+        f"{n}: {j['test_windows_sharing_a_training_flow']:.0%}" for n, j in zip(names, leaks)
+        if j and "test_windows_sharing_a_training_flow" in j
+    )
+    if leak_txt:
+        st.caption(f"{t(lang, 'shared_flows')} — {leak_txt}")
+
+
+if reports["mc_summary"] is not None:
+    st.divider()
+    st.subheader(t(lang, "mc_title"))
+    st.markdown(t(lang, "mc_intro"))
+    cols = [c for c in ("macro_f1_mean", "macro_f1_std", "balanced_accuracy_mean", "weighted_f1_mean")
+            if c in reports["mc_summary"].columns]
+    st.dataframe(pretty(reports["mc_summary"][cols], lang).style.format("{:.3f}"), width="stretch")
+    mc_meta = load_json("multiclass/summary.json")
+    if mc_meta and mc_meta.get("excluded"):
+        st.caption(t(lang, "mc_excluded", items=", ".join(f"{k} ({v})" for k, v in mc_meta["excluded"].items())))
+    if reports["mc_cm"] is not None:
+        st.plotly_chart(
+            confusion_heatmap(reports["mc_cm"], {"true": pretty_label(lang, "true"),
+                                                 "pred": pretty_label(lang, "pred")}, dark=dark),
+            width="stretch", config={"displayModeBar": False},
         )
+        st.caption(t(lang, "mc_cm_caption"))
+    if reports["mc_per_class"] is not None:
+        st.dataframe(pretty(reports["mc_per_class"], lang).style.format("{:.3f}"), width="stretch")
+    if reports["mc_ablation"] is not None:
+        st.markdown(t(lang, "mc_ablation"))
+        st.dataframe(pretty(reports["mc_ablation"], lang).style.format("{:.3f}"), width="stretch")
 
 with st.expander("🎯 " + t(lang, "control_title"), expanded=True):
     st.markdown(t(lang, "control_intro"))

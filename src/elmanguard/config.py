@@ -83,6 +83,19 @@ class Config:
     still a contiguous run of real flows.
     """
 
+    cap_by_label: bool = False
+    """Apply ``max_windows_per_group_day`` per window label instead of per group.
+
+    Off for detection, so the reported binary numbers stay reproducible. On for
+    the multiclass task, where a proportional cap leaves minority attack types
+    with too few windows to learn or to score.
+    """
+
+    multiclass_min_windows: int = 60
+    """Attack types with fewer windows than this are excluded from the
+    multiclass task and listed in the report, rather than scored on a handful of
+    examples."""
+
     control_host: str = "192.168.10.50"
     """The server that receives both heavy attack traffic and ordinary traffic.
 

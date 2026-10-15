@@ -1,0 +1,63 @@
+{
+  "classes": [
+    "BENIGN",
+    "Bot",
+    "DDoS",
+    "DoS GoldenEye",
+    "DoS Hulk",
+    "DoS Slowhttptest",
+    "DoS slowloris",
+    "FTP-Patator",
+    "PortScan",
+    "SSH-Patator",
+    "Web Attack - Brute Force",
+    "Web Attack - XSS"
+  ],
+  "excluded": {
+    "Heartbleed": 5,
+    "Infiltration": 5,
+    "Web Attack - Sql Injection": 6
+  },
+  "windows": {
+    "train": 86658,
+    "calib": 23619,
+    "test": 25026
+  },
+  "test_windows_sharing_a_training_flow": 0.0,
+  "config": {
+    "window": 16,
+    "stride_train": 8,
+    "stride_eval": 8,
+    "min_flows_per_host": 16,
+    "group_key": "destination_ip",
+    "max_windows_per_group_day": 1500,
+    "cap_by_label": true,
+    "multiclass_min_windows": 60,
+    "control_host": "192.168.10.50",
+    "use_destination_port": false,
+    "log1p_transform": true,
+    "clip_sigma": 10.0,
+    "drop_duplicate_flows": false,
+    "units": 64,
+    "dropout": 0.2,
+    "l2": 1e-05,
+    "learning_rate": 0.003,
+    "batch_size": 256,
+    "epochs": 80,
+    "patience": 15,
+    "seed": 42,
+    "class_weight": true,
+    "target_fpr": 0.01,
+    "train_days": [
+      "Monday",
+      "Tuesday",
+      "Wednesday"
+    ],
+    "calib_days": [
+      "Thursday"
+    ],
+    "test_days": [
+      "Friday"
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+# Tudo do app, mais o necessário para testar, preparar os dados e gerar figuras.
+#   pip install -r requirements-dev.txt
+-r requirements.txt
+pytest==8.4.2
+matplotlib==3.10.9

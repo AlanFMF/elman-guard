@@ -1,0 +1,69 @@
+# Testes automáticos a cada push e pull request.
+#
+# Dois jobs, em sequência:
+#   1. "Testes rápidos"          — parser, sequências, protocolos, métricas (sem treinar nada)
+#   2. "Aferição do instrumento" — treina modelos pequenos e confirma que o harness
+#                                  enxerga um sinal temporal plantado de propósito.
+# O segundo só roda se o primeiro passar. O selo do README fica verde só com os dois.
+#
+# Nenhum job precisa do CICIDS2017: toda a suíte roda sobre tráfego sintético.
+
+name: testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_CPP_MIN_LOG_LEVEL: "3"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  rapidos:
+    name: Testes rápidos
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements-dev.txt
+
+      - name: Testes sem treino de modelos
+        run: pytest -m "not slow"
+
+  afericao:
+    name: Aferição do instrumento
+    needs: rapidos
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements-dev.txt
+
+      - name: Testes que treinam modelos
+        run: pytest -m slow

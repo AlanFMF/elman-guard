@@ -1,0 +1,16 @@
+,train,calib,test,in_task
+BENIGN,80686,21664,23081,True
+DDoS,901,300,300,True
+DoS Hulk,900,300,299,True
+PortScan,900,300,300,True
+DoS GoldenEye,778,259,257,True
+FTP-Patator,636,211,208,True
+SSH-Patator,500,166,165,True
+DoS slowloris,454,150,147,True
+DoS Slowhttptest,427,137,140,True
+Bot,269,67,67,True
+Web Attack - Brute Force,136,45,43,True
+Web Attack - XSS,61,19,18,True
+Web Attack - Sql Injection,4,0,0,False
+Infiltration,3,1,0,False
+Heartbleed,3,0,1,False

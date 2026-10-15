@@ -5,11 +5,12 @@
 </p>
 
 <p align="center">
-  <img alt="Python" src="https://img.shields.io/badge/python-3.10%2B-3776ab?logo=python&logoColor=white">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab?logo=python&logoColor=white">
   <img alt="TensorFlow" src="https://img.shields.io/badge/TensorFlow-2.21-ff6f00?logo=tensorflow&logoColor=white">
   <img alt="Streamlit" src="https://img.shields.io/badge/Streamlit-app-ff4b4b?logo=streamlit&logoColor=white">
   <img alt="Dataset" src="https://img.shields.io/badge/dataset-CICIDS2017-1baf7a">
   <img alt="License" src="https://img.shields.io/badge/license-MIT-2a78d6">
+  <a href="https://github.com/AlanFMF/elman-guard/actions/workflows/tests.yml"><img alt="Tests" src="https://github.com/AlanFMF/elman-guard/actions/workflows/tests.yml/badge.svg"></a>
 </p>
 
 <p align="center"><a href="README.md">🇧🇷 Leia em português</a></p>
@@ -24,23 +25,37 @@ whose attack types it has never seen.
 The point of the repository is not the detector. It is the four controls around
 it, and what they reveal.
 
-## Three findings
+## Five findings
 
-**1 · Temporal order carries no measurable signal here — and that null is credible.**
+**1 · For detection, temporal order carries no measurable signal — and that null is credible.**
 Shuffling the flows inside every window destroys the order while keeping the
 contents. The Elman's PR-AUC falls by **0.055**; the seed-to-seed standard
 deviation of the same measurement is **0.117**. The effect is smaller than the
 noise. What makes this worth stating is the instrument check below: the same
 harness detects a *planted* temporal signal at PR-AUC 0.985.
 
-**2 · Most of the apparent skill is host recognition, not attack detection.**
+**2 · Faced with an unseen attack type, almost all of the apparent skill is host recognition.**
 Pooled across servers the models reach PR-AUC 0.31–0.55. Computed *inside* each
 host — where "which machine is this" carries no information — every neural model
-sits at or below chance on every host. Only a logistic regression on the single
-heavily attacked server clears it, at ROC-AUC 0.694.
+sits at or below chance. Only a logistic regression on the heavily attacked server
+clears it, at ROC-AUC 0.694. **With attack types already seen, the verdict flips:**
+inside the same server, detection is real, at ROC-AUC 0.82 to 0.93.
 
-**3 · A linear model beats every neural architecture, and the four networks are
-indistinguishable from each other.**
+**3 · A linear model beats the neural networks under every protocol tested.**
+Logistic regression has the highest PR-AUC under all three detection protocols and
+the highest macro-F1 on the multiclass task. For detection, the four networks are
+indistinguishable — the gap between them is smaller than one network's own spread
+across seeds.
+
+**4 · The protocol decides the number — and leakage is the smaller part of the inflation.**
+The random split leaves training flows in 66% of test windows, yet that is worth
+only ~0.01 PR-AUC for the MLP and the logistic regression. What really inflates
+the score is testing only attack types already known: 0.21 to 0.36.
+
+**5 · To name the attack, the Elman beats the MLP — but not through memory.**
+On the multiclass task it outscores its non-recurrent counterpart by 0.08
+macro-F1, and the lead survives whole when flow order is destroyed. What it has
+over the MLP is weight sharing across the window, not memory of the sequence.
 
 ![Architecture comparison](assets/architecture_comparison.png)
 
@@ -232,6 +247,136 @@ precision to a perfect 1.000, which is the fingerprint of a model that has found
 an identity shortcut and fires only when it is certain. Reported as measured
 rather than as predicted.
 
+## The protocol decides the number
+
+The same models, on the same windows, scored three ways:
+
+| protocol | what separates train from test | test windows holding a training flow |
+|---|---|---|
+| **random** | shuffled windows — the protocol most published results use | **66%** |
+| **temporal, embargoed** | every attack burst cut in time; any window sharing a flow across the boundary is dropped | 0% |
+| **chronological** | train Monday to Wednesday, test Friday | 0%, by construction |
+
+![Each model's PR-AUC under the three protocols](assets/protocols.png)
+
+| model | random | temporal | chronological |
+|---|---|---|---|
+| logistic regression | 0.772 | 0.761 | 0.546 |
+| Elman RNN | 0.742 ± 0.012 | 0.671 ± 0.021 | 0.341 ± 0.117 |
+| window MLP | 0.716 ± 0.029 | 0.707 ± 0.005 | 0.347 ± 0.050 |
+| prevalence floor | 0.035 | 0.040 | 0.081 |
+
+**Inflation has two causes, and the one usually blamed is the smaller.** The leak
+is real — two thirds of the random split's test windows contain at least one flow
+the model trained on — but it is cheap: about 0.01 PR-AUC for the MLP and the
+logistic regression. The big step is the next one. Testing only attack types the
+model already knows, instead of unseen ones, is worth **0.21 to 0.36**. A random
+split on CICIDS2017 does not measure intrusion detection; it measures recognition
+of catalogued attacks.
+
+**The recurrent network profits most from the leak.** When the embargo goes in,
+the Elman loses 0.07 — about three standard deviations — while the MLP's drop is
+within noise. Overlapping windows share a run of eight flows, and the model that
+reads sequences is exactly the one that gains most from having seen it already.
+
+**And the within-host control changes its verdict.** Inside the attacked server
+(`192.168.10.50`), with known attack types, detection is real: ROC-AUC 0.82
+(Elman), 0.84 (MLP) and 0.93 (logistic). With unseen types it falls to 0.56, 0.45
+and 0.69. So the conclusion that "the skill is host recognition" holds for attacks
+never seen before. When the type is known, the models read the traffic.
+
+What the temporal protocol does **not** guarantee: it is not chronological across
+classes. Benign traffic from late in a day can train a model tested on an attack
+from earlier that day. It guarantees that no flow is seen on both sides — and that,
+within each attack type, the test comes after the training.
+
+## Multiclass: which attack is it?
+
+Detection answers "is something wrong in this window?". The next question an
+IDS operator asks is *what*. Same discipline as the binary task: matched parameter
+budgets, three seeds, a linear baseline and the order ablation.
+
+Two choices are forced by the data:
+
+- **The protocol is the temporal, embargoed one.** On the chronological split the
+  test day only holds types never seen in training — and no classifier can name a
+  class it was never shown.
+- **The window cap is applied per attack type.** With the proportional cap used
+  for detection, a minority attack on a busy server kept only a few dozen windows.
+  Even so, three types fall short of the 60-window minimum — Heartbleed (5
+  windows), Infiltration (5) and SQL injection (6) — and leave the task, listed in
+  the report.
+
+That leaves **12 classes** — benign traffic and 11 attack types — and no test
+window shares a flow with training. The headline metric is **macro-F1**, where
+every type weighs the same: a model cannot score well by being right about benign
+traffic and DoS Hulk alone.
+
+| model | macro-F1 | balanced accuracy | weighted F1 |
+|---|---|---|---|
+| logistic regression | **0.749** | 0.788 | 0.960 |
+| Elman RNN | 0.711 ± 0.022 | **0.843 ± 0.012** | 0.926 ± 0.011 |
+| window MLP | 0.630 ± 0.022 | 0.807 ± 0.009 | 0.914 ± 0.006 |
+
+![Elman confusion matrix](assets/confusion_matrix.png)
+
+**Here the recurrent network beats its non-recurrent counterpart** — by 0.08
+macro-F1, nearly four standard deviations, at the same parameter budget. It is the
+first task in this project where that happens.
+
+**But not because of order.** Shuffling the flows inside every window does not
+bring the Elman down — and its lead over the MLP survives whole:
+
+| model | macro-F1, real order | macro-F1, shuffled | difference |
+|---|---|---|---|
+| Elman RNN | 0.711 ± 0.022 | 0.722 ± 0.013 | +0.011 |
+| window MLP | 0.630 ± 0.022 | 0.607 ± 0.039 | −0.023 |
+
+Both differences are within noise. What fits is a structural explanation, not a
+temporal one: the recurrent layer applies **the same weights** to each of the 16
+flows, while the flattened MLP, on the same budget, has to learn separate weights
+for every position — and is left with only 8 hidden units to do it. The Elman wins
+by *sharing* weights across the window, not by *remembering* the sequence. That is a
+hypothesis: the ablation rules out order as the cause, but does not test weight
+sharing directly.
+
+**The logistic regression still has the highest macro-F1, but the Elman gets more
+of each class right.** Balanced accuracy is the mean per-class recall, and there
+the Elman leads (0.843 against 0.788). Macro-F1 also punishes precision, and that
+is where it loses: 12% of benign windows are labelled "Bot". With 23 thousand
+benign test windows and only 67 Bot ones, those false alarms drown the whole class
+— Bot scores an F1 of 0.03 for every model.
+
+**The errors fall where an analyst would expect them.** Apart from Bot, which
+blends into normal traffic, and GoldenEye, read as benign in 14% of windows, the
+confusions stay inside an attack family:
+
+- **slowloris → Slowhttptest (35%)**. Both are "slow" DoS attacks that hold HTTP
+  connections open with almost no traffic. At flow level they are nearly the same
+  gesture.
+- **web brute force ↔ XSS (26% and 39%)**. Both hit the same web application, on
+  the same port, with similar HTTP requests.
+- **Bot ↔ benign (48%)**. Half of the Bot traffic passes for normal — which is
+  exactly what a well-built bot tries to look like.
+
+The model gets the species wrong far more often than the genus. Per-type F1, mean
+over three seeds:
+
+| attack type | Elman | window MLP | logistic |
+|---|---|---|---|
+| benign | 0.934 | 0.929 | 0.969 |
+| DDoS | 0.988 | 0.944 | 0.992 |
+| PortScan | 0.988 | 0.953 | 0.986 |
+| FTP-Patator | 0.953 | 0.857 | 0.981 |
+| DoS GoldenEye | 0.882 | 0.763 | 0.900 |
+| DoS Hulk | **0.838** | 0.671 | 0.766 |
+| SSH-Patator | 0.709 | 0.592 | 0.878 |
+| DoS Slowhttptest | 0.674 | 0.634 | 0.715 |
+| DoS slowloris | 0.643 | 0.555 | 0.697 |
+| Web: XSS | **0.451** | 0.431 | 0.426 |
+| Web: brute force | 0.441 | 0.199 | 0.642 |
+| Bot | 0.029 | 0.031 | 0.033 |
+
 ## Method
 
 Full detail in [`docs/how_it_works.en.md`](docs/how_it_works.en.md). The short
@@ -273,11 +418,20 @@ CICIDS2017 is not redistributable, so the raw capture is not in the repository.
 git clone https://github.com/AlanFMF/elman-guard.git
 cd elman-guard
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
-pytest -m "not slow"        # 22 tests, no dataset needed
-pytest                      # adds the instrument checks (trains small models)
+pytest -m "not slow"        # 37 tests, no dataset needed
+pytest                      # 41: adds the instrument checks, which train small models
+streamlit run app.py        # opens with the trained model and a sample of the test day
 ```
+
+`requirements.txt` holds only what the app needs — it is what Streamlit Cloud
+installs. `requirements-dev.txt` adds pytest and matplotlib. Python 3.11, also
+verified on 3.12.
+
+All 41 tests run on **GitHub Actions** on every push, in two stages: the fast ones
+first; then, only if they pass, the ones that train models and check the harness
+itself. The badge at the top of this README is the latest run.
 
 With the data (download `GeneratedLabelledFlows.zip` from the
 [CIC](https://www.unb.ca/cic/datasets/ids-2017.html) — **not** the
@@ -286,11 +440,16 @@ and cannot be sequenced):
 
 ```bash
 python scripts/prepare_data.py --raw path/to/TrafficLabelling --out data/processed
-python scripts/run_experiment.py --split chronological --seeds 0 1 2
-python scripts/run_experiment.py --split random --seeds 0 1 2   # the inflated protocol
+
+python scripts/run_experiment.py --split chronological            # unseen attack types
+python scripts/run_experiment.py --split temporal --models elman window_mlp \
+       --skip-ablation --skip-grouping-experiment                  # known types, embargoed
+python scripts/run_experiment.py --split random --models elman window_mlp \
+       --skip-ablation --skip-grouping-experiment                  # the inflated protocol
+python scripts/run_multiclass.py                                   # which attack is it
+
 python scripts/export_demo.py
 python scripts/make_figures.py
-streamlit run app.py
 ```
 
 The app is bilingual and shows the attack probability through the test day for a
@@ -310,12 +469,18 @@ measured results above.
   inside the context. Longer windows were not swept.
 - **Three seeds** is enough to show the gaps are noise, not enough to resolve
   small real differences.
-- **Only the chronological and random protocols** were compared. Host-disjoint
-  splitting is impossible here: one machine sends nearly all attack traffic.
+- **Host-disjoint splitting is still impossible.** Three protocols were compared,
+  but none separates machines: one host sends almost all attack traffic, so it
+  can only sit on one side.
+- **The multiclass task excludes three attack types.** Heartbleed, Infiltration
+  and SQL injection have 5 to 6 windows in the whole capture — too few to learn
+  or to score. They are listed in the report, not hidden.
 
 ### What I would try next
 
-Longer and multi-scale windows; a per-host baseline model so the score is
+A model that applies one shared layer to every flow and averages the result (a
+*Deep Sets* model) — the direct test of whether the Elman's multiclass edge comes
+from weight sharing rather than memory. Then: longer and multi-scale windows; a per-host baseline model so the score is
 "unusual *for this server*" rather than "unusual"; and the corrected CICIDS2017
 re-release, to see which of these findings survive better labels.
 

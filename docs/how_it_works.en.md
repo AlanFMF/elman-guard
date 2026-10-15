@@ -63,3 +63,25 @@ budget. Only the ability to use order changes:
   on a probe where order is the *only* signal. An earlier configuration scored
   chance on it — and would have produced a confident, false "recurrence doesn't
   help". The current one reaches PR-AUC 0.985 there.
+
+### 6 · Three evaluation protocols
+
+* **Chronological** — train Monday to Wednesday, threshold Thursday, test Friday.
+  Every test attack type is unseen. This is the headline result.
+* **Temporal, embargoed** — every attack burst is cut in time (start to train, end
+  to test), and any window sharing a flow across the boundary is dropped. Known
+  types, unseen flows.
+* **Random** — shuffled windows. Kept to measure how much the usual protocol
+  inflates the numbers, and why.
+
+The gap between random and temporal is flow leakage. The gap between temporal and
+chronological is the cost of meeting an attack type for the first time.
+
+### 7 · Multiclass
+
+Beyond "is there an attack?", the question "which one?". It uses the temporal
+protocol — on the chronological one the test day only holds types never seen, and
+no model can name a class it was never shown. The window cap is applied per attack
+type so minority types do not vanish, and types with too few windows to learn or
+score are excluded and listed. The headline metric is macro-F1, where every type
+weighs the same.
