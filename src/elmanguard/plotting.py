@@ -110,8 +110,11 @@ def comparison_figure(summary: pd.DataFrame, labels: dict[str, str], dark: bool 
         x=[names.get(i, i) for i in df.index], y=df["pr_auc_mean"],
         error_y=dict(type="data", array=df.get("pr_auc_std"), color=c["ink_soft"], width=6),
         marker=dict(color=c["score"], line=dict(width=0)),
-        text=[f"{v:.3f}" for v in df["pr_auc_mean"]], textposition="outside",
-        textfont=dict(color=c["ink_soft"], size=11), name="PR-AUC",
+        # A d3 template rather than Python-formatted text, so the layout's
+        # `separators` setting can give Portuguese its decimal comma.
+        # Labels sit at the foot of each bar: on top, the error bar runs through them.
+        texttemplate="%{y:.3f}", textposition="inside", insidetextanchor="start",
+        textangle=0, textfont=dict(color="#ffffff", size=12), name="PR-AUC",
         hovertemplate="%{x}: %{y:.4f}<extra></extra>",
     ))
     if floor is not None:

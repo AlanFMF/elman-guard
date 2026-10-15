@@ -21,7 +21,7 @@ import streamlit as st  # noqa: E402
 
 from elmanguard.config import DEFAULT  # noqa: E402
 from elmanguard.features import FeaturePipeline  # noqa: E402
-from elmanguard.i18n import LANGUAGES, pretty, t  # noqa: E402
+from elmanguard.i18n import LANGUAGES, num, plot_separators, pretty, styled, t  # noqa: E402
 from elmanguard.plotting import comparison_figure, confusion_heatmap, timeline_figure  # noqa: E402
 
 MODELS = ROOT / "models"
@@ -80,6 +80,11 @@ def load_json(name):
     return json.loads(p.read_text()) if p.exists() else None
 
 
+def chart(fig) -> None:
+    fig.update_layout(separators=plot_separators(lang))
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+
+
 def pretty_label(lang: str, key: str) -> str:
     return {"en": {"true": "true type", "pred": "predicted"},
             "pt": {"true": "tipo real", "pred": "previsto"}}[lang][key]
@@ -120,22 +125,21 @@ else:
     recall = float(((scores >= threshold) & (y == 1)).sum() / max(int(y.sum()), 1))
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric(t(lang, "metric_windows"), f"{mask.sum():,}")
-    c2.metric(t(lang, "metric_attack"), f"{int(y.sum()):,}",
+    c1.metric(t(lang, "metric_windows"), num(lang, int(mask.sum())))
+    c2.metric(t(lang, "metric_attack"), num(lang, int(y.sum())),
               t(lang, "metric_attack_delta", pct=f"{y.mean():.0%}"), delta_color="off")
-    c3.metric(t(lang, "metric_flagged"), f"{flagged:,}")
+    c3.metric(t(lang, "metric_flagged"), num(lang, flagged))
     c4.metric(t(lang, "metric_recall"), f"{recall:.0%}")
 
     st.subheader(t(lang, "timeline_title"))
     st.caption(t(lang, "timeline_help"))
-    st.plotly_chart(
+    chart(
         timeline_figure(times.to_numpy(), scores, y, threshold,
                         {"score": t(lang, "p_attack"),
                          "truth": "ground-truth attack" if lang == "en" else "ataque (rótulo real)",
                          "threshold": "alert threshold" if lang == "en" else "limiar de alerta",
                          "x": "window (in time order)" if lang == "en" else "janela (em ordem temporal)",
                          "y": t(lang, "p_attack")}, dark=dark),
-        width="stretch", config={"displayModeBar": False},
     )
 
     table = pd.DataFrame({
@@ -143,7 +147,7 @@ else:
         "attack_type": demo["attack_type"][mask],
     }).sort_values("time")
     with st.expander("🔢 " + t(lang, "window_table")):
-        st.dataframe(table, width="stretch", height=300)
+        st.dataframe(styled(table, lang), width="stretch", height=300)
     st.download_button(
         t(lang, "download"), table.to_csv(index=False).encode(),
         file_name=f"elmanguard_{host}.csv", mime="text/csv",
@@ -161,17 +165,16 @@ if reports["pooled"] is None:
 else:
     cols = [c for c in ("pr_auc_mean", "pr_auc_std", "recall_mean", "precision_mean", "f1_mean")
             if c in reports["pooled"].columns]
-    st.dataframe(pretty(reports["pooled"][cols], lang), width="stretch")
-    st.plotly_chart(
-        comparison_figure(reports["pooled"],
-                          {"floor": t(lang, "prevalence_floor_label")}, dark=dark, lang=lang),
-        width="stretch", config={"displayModeBar": False},
-    )
+    st.dataframe(styled(pretty(reports["pooled"][cols], lang), lang), width="stretch")
+    chart(comparison_figure(reports["pooled"],
+                            {"floor": t(lang, "prevalence_floor_label")}, dark=dark, lang=lang))
     if reports["per_attack"] is not None:
         st.caption("Recall by attack type — every type below is unseen during training."
                    if lang == "en" else
                    "Recall por tipo de ataque — todos os tipos abaixo são inéditos no treino.")
-        st.dataframe(pretty(reports["per_attack"], lang), width="stretch")
+        # The prevalence floor has no per-type recall: drop columns with nothing in them.
+        per_attack = reports["per_attack"].dropna(axis=1, how="all")
+        st.dataframe(styled(pretty(per_attack, lang), lang), width="stretch")
 
 
 if reports["random"] is not None and reports["temporal"] is not None and reports["pooled"] is not None:
@@ -181,7 +184,7 @@ if reports["random"] is not None and reports["temporal"] is not None and reports
     frames = [reports["random"], reports["temporal"], reports["pooled"]]
     models = [m for m in ("elman", "window_mlp", "logistic") if all(m in f.index for f in frames)]
     ladder = pd.DataFrame({n: f.loc[models + ["prevalence_floor"], "pr_auc_mean"] for n, f in zip(names, frames)})
-    st.dataframe(pretty(ladder, lang).style.format("{:.3f}"), width="stretch")
+    st.dataframe(styled(pretty(ladder, lang), lang), width="stretch")
     leaks = [load_json(p) for p in ("random_split/summary.json", "temporal_split/summary.json", "summary.json")]
     leak_txt = " · ".join(
         f"{n}: {j['test_windows_sharing_a_training_flow']:.0%}" for n, j in zip(names, leaks)
@@ -197,32 +200,29 @@ if reports["mc_summary"] is not None:
     st.markdown(t(lang, "mc_intro"))
     cols = [c for c in ("macro_f1_mean", "macro_f1_std", "balanced_accuracy_mean", "weighted_f1_mean")
             if c in reports["mc_summary"].columns]
-    st.dataframe(pretty(reports["mc_summary"][cols], lang).style.format("{:.3f}"), width="stretch")
+    st.dataframe(styled(pretty(reports["mc_summary"][cols], lang), lang), width="stretch")
     mc_meta = load_json("multiclass/summary.json")
     if mc_meta and mc_meta.get("excluded"):
         st.caption(t(lang, "mc_excluded", items=", ".join(f"{k} ({v})" for k, v in mc_meta["excluded"].items())))
     if reports["mc_cm"] is not None:
-        st.plotly_chart(
-            confusion_heatmap(reports["mc_cm"], {"true": pretty_label(lang, "true"),
-                                                 "pred": pretty_label(lang, "pred")}, dark=dark),
-            width="stretch", config={"displayModeBar": False},
-        )
+        chart(confusion_heatmap(reports["mc_cm"], {"true": pretty_label(lang, "true"),
+                                                   "pred": pretty_label(lang, "pred")}, dark=dark))
         st.caption(t(lang, "mc_cm_caption"))
     if reports["mc_per_class"] is not None:
-        st.dataframe(pretty(reports["mc_per_class"], lang).style.format("{:.3f}"), width="stretch")
+        st.dataframe(styled(pretty(reports["mc_per_class"], lang), lang), width="stretch")
     if reports["mc_ablation"] is not None:
         st.markdown(t(lang, "mc_ablation"))
-        st.dataframe(pretty(reports["mc_ablation"], lang).style.format("{:.3f}"), width="stretch")
+        st.dataframe(styled(pretty(reports["mc_ablation"], lang), lang), width="stretch")
 
 with st.expander("🎯 " + t(lang, "control_title"), expanded=True):
     st.markdown(t(lang, "control_intro"))
     if reports["within_host"] is not None:
-        st.dataframe(pretty(reports["within_host"], lang), width="stretch")
+        st.dataframe(styled(pretty(reports["within_host"], lang), lang), width="stretch")
 
 with st.expander("🔀 " + t(lang, "ablation_title"), expanded=True):
     st.markdown(t(lang, "ablation_intro"))
     if reports["ablation"] is not None:
-        st.dataframe(pretty(reports["ablation"], lang), width="stretch")
+        st.dataframe(styled(pretty(reports["ablation"], lang), lang), width="stretch")
 
 with st.expander("🧠 " + t(lang, "how_title")):
     doc = ROOT / "docs" / f"how_it_works.{lang}.md"

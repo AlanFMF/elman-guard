@@ -7,13 +7,13 @@
 <p align="center">
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%20%7C%203.12-3776ab?logo=python&logoColor=white">
   <img alt="TensorFlow" src="https://img.shields.io/badge/TensorFlow-2.21-ff6f00?logo=tensorflow&logoColor=white">
-  <img alt="Streamlit" src="https://img.shields.io/badge/Streamlit-app-ff4b4b?logo=streamlit&logoColor=white">
+  <a href="https://elman-guard-apps4fvjn5n5fsk4kb9v2wv.streamlit.app/"><img alt="Abrir o app" src="https://img.shields.io/badge/Streamlit-abrir_o_app-ff4b4b?logo=streamlit&logoColor=white"></a>
   <img alt="Dataset" src="https://img.shields.io/badge/dataset-CICIDS2017-1baf7a">
   <img alt="License" src="https://img.shields.io/badge/licença-MIT-2a78d6">
   <a href="https://github.com/AlanFMF/elman-guard/actions/workflows/tests.yml"><img alt="Testes" src="https://github.com/AlanFMF/elman-guard/actions/workflows/tests.yml/badge.svg"></a>
 </p>
 
-<p align="center"><a href="README.en.md">🇺🇸 Read in English</a></p>
+<p align="center"><strong><a href="https://elman-guard-apps4fvjn5n5fsk4kb9v2wv.streamlit.app/">▶ Abrir o app online</a></strong> · <a href="README.en.md">🇺🇸 Read in English</a></p>
 
 ---
 
@@ -63,6 +63,10 @@ mais é compartilhar pesos ao longo da janela, não lembrar a sequência.
 <summary><strong>O app</strong> (clique para expandir)</summary>
 
 ![App Streamlit](assets/app-pt-monitoramento.png)
+
+**[Abra o app](https://elman-guard-apps4fvjn5n5fsk4kb9v2wv.streamlit.app/)** e escolha outro servidor ou mude o limiar. Se ele
+estiver dormindo (o plano gratuito desliga apps sem visita), clique para acordá-lo
+e espere um minuto.
 
 O dia de teste no servidor atacado. O dia inteiro está sombreado porque 98,6% das
 suas janelas contêm tráfego de ataque — e a probabilidade do modelo passa longos
@@ -411,6 +415,8 @@ Entrada (16, 78) → SimpleRNN(64, tanh) → Dropout(0,2) → Dense(1, sigmoid)
 
 ## Como rodar
 
+Para só usar o app, não precisa instalar nada: [abra a versão online](https://elman-guard-apps4fvjn5n5fsk4kb9v2wv.streamlit.app/).
+
 O CICIDS2017 não é redistribuível, então a captura bruta não está no repositório.
 
 ```bash
@@ -419,8 +425,8 @@ cd elman-guard
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 
-pytest -m "not slow"        # 37 testes, sem precisar do dataset
-pytest                      # 41: inclui as aferições do instrumento, que treinam modelos pequenos
+pytest -m "not slow"        # 41 testes, sem precisar do dataset
+pytest                      # 45: inclui as aferições do instrumento, que treinam modelos pequenos
 streamlit run app.py        # abre com o modelo treinado e uma amostra do dia de teste
 ```
 
@@ -428,7 +434,7 @@ O `requirements.txt` tem só o que o app precisa — é o que o Streamlit Cloud
 instala. O `requirements-dev.txt` acrescenta pytest e matplotlib. Python 3.11,
 verificado também em 3.12.
 
-Os 41 testes rodam no **GitHub Actions** a cada push, em dois estágios: primeiro
+Os 45 testes rodam no **GitHub Actions** a cada push, em dois estágios: primeiro
 os rápidos; depois, só se eles passarem, os que treinam modelos e aferem o
 próprio harness. O selo no topo deste README é o resultado da última execução.
 

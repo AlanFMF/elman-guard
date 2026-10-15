@@ -31,3 +31,19 @@ def test_app_renders_without_errors(language):
     assert len(labels) == 4, labels
     expected = "Janelas" if language.startswith("Português") else "Windows"
     assert labels[0] == expected
+    # The demo host has 1,500 windows: written 1.500 in Portuguese.
+    windows = at.metric[0].value
+    assert windows == ("1.500" if language.startswith("Português") else "1,500"), windows
+
+
+@pytest.mark.parametrize("value, spec, en, pt", [
+    (1500, ",", "1,500", "1.500"),
+    (1234567, ",", "1,234,567", "1.234.567"),
+    (0.3414, ".3f", "0.341", "0,341"),
+    (12345.678, ",.2f", "12,345.68", "12.345,68"),
+])
+def test_numbers_follow_the_language(value, spec, en, pt):
+    from elmanguard.i18n import num
+
+    assert num("en", value, spec) == en
+    assert num("pt", value, spec) == pt

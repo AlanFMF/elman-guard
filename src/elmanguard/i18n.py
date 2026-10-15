@@ -217,6 +217,28 @@ COLUMN_NAMES: dict[str, dict[str, str]] = {
 }
 
 
+def num(lang: str, value, spec: str = ",") -> str:
+    """Format a number the way each language writes it.
+
+    English: 1,500 and 0.341. Portuguese: 1.500 and 0,341.
+    """
+    s = format(value, spec)
+    if lang == "pt":
+        s = s.replace(",", "\0").replace(".", ",").replace("\0", ".")
+    return s
+
+
+def styled(df, lang: str, digits: int = 3):
+    """Display a results frame with the language's decimal and thousands marks."""
+    dec, thousands = (",", ".") if lang == "pt" else (".", ",")
+    return df.style.format(precision=digits, decimal=dec, thousands=thousands, na_rep="—")
+
+
+def plot_separators(lang: str) -> str:
+    """Plotly's `separators` layout value: decimal mark first, then thousands."""
+    return ",." if lang == "pt" else ".,"
+
+
 def pretty(df, lang: str):
     """Rename a results frame's index and columns for display."""
     models = MODEL_NAMES.get(lang, MODEL_NAMES["en"])
